@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>ひと夏のまち</title>
+    <!-- 麦わら帽子のアイコン（コード描画のSVG・外部素材なし） -->
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <!-- ホーム画面に追加するとフルスクリーンで起動する（ブラウザのバーが消える） -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#bfe3f0" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ひと夏" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #2b3550; overflow: hidden; /* ★ロード画面(#title.loading)と同じ暮色に＝縦→横回転で一瞬タイトルが全幅を覆えなくても素の背景が暮色で一様に見える＝「左タイトル/右真っ黒」の怖い分割を解消（ユーザー指摘2026-07-11）。ゲーム中はキャンバスが覆うので影響なし */
+        font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+        color: #3b3024; -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+      #c { display: block; width: 100vw; height: 100vh; touch-action: none; }
+      /* ── 操作ボタンの色は「時刻でうつろう」（2026-07-25・ユーザー指摘「夜になると操作ボタンまわりが微妙」）──
+         昼＝白い和紙のような明るい面に濃い文字。夜＝行灯（あんどん）の陰のような藍の面に灯りいろの文字。
+         夜に昼のままだと、暗い画面でボタンだけが白く光って一番目立ってしまい、しかも濃い文字が沈んで読めない
+         （実測：よふけの画面で、ボタンは まわりの景色より +93 明るかった）。
+         ここに置いた値が「昼の姿」＝正本。夜の姿は main.js の applyUiNight が同じ名前へ上書きする。 */
+      :root {
+        --ui-bg: rgba(244,250,236,0.5);          /* ジャンプの下地 */
+        --ui-bg-on: rgba(228,244,214,0.7);       /*   〃 押したとき */
+        --ui-bg2: rgba(253,248,239,0.46);        /* ドック（ねころぶ/のる/とぶ/しゅかん）の下地 */
+        --ui-bg3: rgba(252,247,238,0.58);        /* ズーム＋−の下地（0.44は下の景色が透けて記号が消えた・2026-07-26） */
+        --ui-bg3-on: rgba(240,232,218,0.7);      /*   〃 押したとき */
+        --ui-fg: #3b4a2e;                        /* ジャンプの文字 */
+        --ui-fg2: #4a4032;                       /* ドックの絵・はなす等の文字 */
+        --ui-fg3: #443d31;                       /* ズーム＋−の記号（#5a5346は明るい草の上で沈んだ・2026-07-26） */
+        --ui-sub: #5c503c;                       /* ドックの小さな言葉（#6a5e4aから少し濃く） */
+        --ui-edge: rgba(255,255,255,0.62);       /* ふち（ジャンプ） */
+        --ui-edge2: rgba(255,255,255,0.6);       /*   〃 ドック */
+        --ui-edge3: rgba(255,255,255,0.58);      /*   〃 ズーム */
+        --ui-tsh: 0 1px 2px rgba(255,255,255,0.6);   /* 文字の影＝昼は白でにじませ、夜は暗くして輪郭を出す */
+        --ui-tsh2: 0 1px 2px rgba(255,255,255,0.5);
+        --ui-tsh3: 0 1px 2px rgba(255,255,255,0.55);
+        --ui-drop: 0 4px 14px rgba(60,80,50,0.22);   /* 落ち影 */
+        --ui-drop2: 0 3px 11px rgba(90,75,50,0.18);
+        --ui-drop3: 0 2px 8px rgba(120,100,70,0.16);
+        --ui-amber: rgba(255,236,191,0.8);       /* 琥珀（いちばん押してほしいボタン）の下地 */
+        --ui-amber-on: rgba(252,224,168,0.92);
+        --ui-amber-fg: #5a4632;
+        --ui-amber-edge: rgba(255,250,235,0.7);
+        --ui-amber-tsh: 0 1px 1px rgba(255,252,244,0.6);
+        --ui-amber-drop: 0 5px 18px rgba(150,110,40,0.28);
+        --ui-panel: rgba(255,250,240,0.94);      /* はなす（#npc）の下地 */
+        --ui-hint: rgba(255,251,243,0.9);        /* 画面上のひとこと */
+        --ui-pale: rgba(244,250,236,0.96);       /* 町へ（#go）の下地 */
+        --ui-pale-near: rgba(236,248,224,0.98);  /*   〃 近づいた時 */
+        --ui-pale-edge: rgba(150,180,120,0.7);
+        --ui-green: rgba(232,246,228,0.95);      /* つかまえる・つる */
+        --ui-green-fg: #2e5a2e;
+        --ui-stick: rgba(255,255,255,0.14);      /* 指で動かす輪 */
+        --ui-stick-edge: rgba(255,255,255,0.4);
+        --ui-knob: rgba(255,255,255,0.55);       /* そのつまみ */
+        --ui-on-green: rgba(74,124,62,0.95);     /* 押して ON の緑（のる）＝白い文字が読める濃さ */
+        --ui-on-blue: rgba(72,106,164,0.95);     /*   〃 青（とぶ・しゅかん） */
+        --ui-on-edge: rgba(255,255,255,0.5);     /*   〃 ふち */
+        /* 軽量モード＝すりガラスを切るぶん、下地を濃くして文字が沈まないようにした版 */
+        --ui-bg-flat: rgba(244,250,236,0.9);
+        --ui-bg2-flat: rgba(253,248,239,0.9);
+        --ui-bg3-flat: rgba(252,247,238,0.86);
+        --ui-amber-flat: rgba(255,236,191,0.95);
+      }
+      /* ボタン連打でのダブルタップ拡大・長押しのテキスト選択/コールアウトを止める（ユーザー要望2026-06-19） */
+      button, .hud { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+      .hud { position: fixed; }
+      #hint { left: 50%; top: calc(3.5% + env(safe-area-inset-top)); transform: translateX(-50%);
+        padding: 0.4em 1.2em; font-size: clamp(13px,2.4vw,18px); letter-spacing: 0.08em;
+        color: var(--ui-fg2); background: var(--ui-hint); border-radius: 999px;
+        box-shadow: 0 2px 10px rgba(90,78,56,0.22); transition: opacity 1.2s ease; }
+      #hint.gone { opacity: 0; pointer-events: none; }
+      /* #act＝その場でできる主要アクション(ねころぶ/はなす/のる…)＝あたたかい琥珀色で目を引く第一ボタン（操作の優先順位・UX見直し2026-06-26） */
+      #act { left: 50%; bottom: calc(15% + env(safe-area-inset-bottom)); transform: translateX(-50%); appearance: none;
+        cursor: pointer; padding: 0.62em 1.9em; font-size: clamp(16px,3.1vw,23px); font-weight: 600; font-family: inherit;
+        color: var(--ui-amber-fg); background: var(--ui-amber); border: 1.5px solid var(--ui-amber-edge); border-radius: 999px;
+        -webkit-backdrop-filter: blur(6px) saturate(1.2); backdrop-filter: blur(6px) saturate(1.2);
+        text-shadow: var(--ui-amber-tsh); box-shadow: var(--ui-amber-drop); display: none; }
+      #act:active { background: var(--ui-amber-on); transform: translateX(-50%) scale(0.95); }
+      /* C⑫：中央下スロット(left:50%)を共有する文脈ボタン(すわる/はなす/つかまえる/つる/町へ)が同時に出たら、
+         translateYで上へ積んで重なりを解消（bottomは触らない＝横画面メディアクエリ/safe-areaをそのまま活かす） */
+      .ctx-up1 { transform: translateX(-50%) translateY(-58px) !important; }
+      .ctx-up2 { transform: translateX(-50%) translateY(-116px) !important; }
+      .ctx-up3 { transform: translateX(-50%) translateY(-174px) !important; }
+      .ctx-up4 { transform: translateX(-50%) translateY(-232px) !important; }
+      /* まどりボタン＝自宅の中でだけ左上に出す。押すと天井が消えて真上から間取りを見られる（ユーザー要望2026-07-20＝自分でいつでも確認・スクショできる） */
+      #plan { left: calc(3% + env(safe-area-inset-left)); top: calc(3.5% + 208px + env(safe-area-inset-top)); padding: 0.42em 1.0em;
+        font-size: clamp(12px,2.2vw,15px); font-weight: 600; font-family: inherit; color: var(--ui-amber-fg); cursor: pointer;
+        background: var(--ui-amber); border: 1.5px solid var(--ui-amber-edge); border-radius: 999px;
+        -webkit-backdrop-filter: blur(6px) saturate(1.2); backdrop-filter: blur(6px) saturate(1.2);
+        text-shadow: var(--ui-amber-tsh); box-shadow: 0 4px 14px rgba(150,110,40,0.24); display: none; z-index: 8; }
+      #plan:active { background: var(--ui-amber-on); transform: scale(0.95); }
+      /* まどりビュー中は他の操作UIを隠して間取りだけに集中（とじるボタン=#planは残す） */
+      body.homeplan #dock, body.homeplan #jump, body.homeplan #zin, body.homeplan #zout, body.homeplan #act, body.homeplan #npc, body.homeplan #lie, body.homeplan #hint, body.homeplan #senko-btn { display: none !important; }
+      #badge { right: calc(3% + env(safe-area-inset-right)); top: calc(3.5% + env(safe-area-inset-top)); padding: 0.3em 0.8em; font-size: clamp(11px,2vw,14px);
+        color: #fdf7ec; background: rgba(74,64,50,0.55); border-radius: 999px; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+      /* ジャンプ＝右下の専用ボタン（親指が届く位置）。ズーム＝右側に＋／－ */
+      /* 右下の操作クラスタ：ジャンプ（大）の上に ＋／－ を等間隔で重ならないよう固定配置 */
+      #jump { right: calc(5% + env(safe-area-inset-right)); bottom: calc(9% + env(safe-area-inset-bottom)); appearance: none; border: none; cursor: pointer;
+        width: 80px; height: 80px; border-radius: 50%; font-size: clamp(14px,2.6vw,18px); font-family: inherit;
+        color: var(--ui-fg); font-weight: 600; background: var(--ui-bg);
+        -webkit-backdrop-filter: blur(6px) saturate(1.2); backdrop-filter: blur(6px) saturate(1.2);
+        text-shadow: var(--ui-tsh); box-shadow: var(--ui-drop); border: 1.5px solid var(--ui-edge); display: none; }
+      #jump:active { background: var(--ui-bg-on); transform: scale(0.94); }
+      /* ズームは補助操作＝控えめに引かせる（主要ボタンを目立たせる・UX見直し2026-06-26）。
+         ただし記号が細いと夜に消えるので、太さは 700 で持たせる（2026-07-25） */
+      .zbtn { right: calc(5% + 16px + env(safe-area-inset-right)); appearance: none; border: none; cursor: pointer; width: 48px; height: 48px;
+        border-radius: 50%; font-size: 24px; font-weight: 700; line-height: 1; font-family: inherit; color: var(--ui-fg3);
+        -webkit-backdrop-filter: blur(6px) saturate(1.15); backdrop-filter: blur(6px) saturate(1.15);
+        text-shadow: var(--ui-tsh3); border: 1.5px solid var(--ui-edge3);
+        background: var(--ui-bg3); box-shadow: var(--ui-drop3); display: none; }
+      #zout { bottom: calc(9% + 90px + env(safe-area-inset-bottom)); }
+      #zin { bottom: calc(9% + 150px + env(safe-area-inset-bottom)); }
+      .zbtn:active { background: var(--ui-bg3-on); transform: scale(0.94); }
+      /* 主観モードの説明＝下部中央のドック/ジャンプと干渉していたので上部中央へ退避（横画面で操作ボタンに被らない・ユーザー指摘2026-07-01） */
+      #look { left: 50%; top: calc(3.5% + env(safe-area-inset-top)); transform: translateX(-50%); padding: 0.4em 1.1em;
+        font-size: clamp(12px,2.2vw,16px); color: #fdf7ec; background: rgba(60,66,98,0.8);
+        border-radius: 999px; display: none; z-index: 7; white-space: nowrap; max-width: 92vw; }
+      /* ── 下部中央のドック：移動/くつろぎのトグルを一列にまとめる（ねころぶ・🚲・🎈）＝散らからない ── */
+      #dock { left: 50%; bottom: calc(5% + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 10px; align-items: flex-end; z-index: 6; }
+      /* ドックの各ボタンは「絵＋小さな言葉」で統一＝🚲🎈📷が何か一目で分かる（UX見直し2026-06-26） */
+      #dock > button { position: static; appearance: none; cursor: pointer; font-family: inherit; color: var(--ui-fg2);
+        background: var(--ui-bg2); border: 1.5px solid var(--ui-edge2); border-radius: 18px;
+        -webkit-backdrop-filter: blur(6px) saturate(1.2); backdrop-filter: blur(6px) saturate(1.2);
+        text-shadow: var(--ui-tsh2); box-shadow: var(--ui-drop2);
+        display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1.04; padding: 0.42em 0.7em; min-width: 3.4em; }
+      #dock > button b { font-size: clamp(17px,3.2vw,21px); font-style: normal; }
+      /* 小さな言葉は9pxだと夜に読めないので下限を10pxへ（2026-07-25・ボタンの大きさは変わらない） */
+      #dock > button i { font-size: clamp(10px,1.9vw,12px); font-style: normal; color: var(--ui-sub); letter-spacing: 0.02em; }
+      #dock > button:active { transform: scale(0.93); }
+      /* （撤回2026-06-27）以前は1日目だけ🚲のる/🎈とぶを隠していたが、「機能が消えた」とユーザー指摘＝機能削減はNG。常に表示する（body.day1での非表示を廃止） */
+      /* ★押して ON にした時の色（2026-07-26・ユーザー実機指摘「文字が白くて見づらい」）。
+         旧＝薄い緑/青に真っ白の文字＝実測の明暗比が 2.2（押す前の 3.4 より悪化していた）。
+         白い文字を乗せるなら面を濃くする。あわせて夜は行灯いろへ沈める。 */
+      #bike.on i, #float.on i, #fpvbtn.on i { color: rgba(255,255,255,0.97); }
+      #bike.on, #float.on, #fpvbtn.on { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); border-color: var(--ui-on-edge); }
+      #bike.on { background: var(--ui-on-green); }
+      #float.on, #fpvbtn.on { background: var(--ui-on-blue); }
+      body.flying #dock { display: none !important; }
+      body.pm-on #dock { display: none !important; }
+      /* 滑走中は関係ないボタンを隠す＝視点きりかえ(#act)だけ残し、重なりを解消（ユーザー指摘2026-06-26） */
+      body.sliding #dock, body.sliding #jump, body.sliding #zin, body.sliding #zout { display: none !important; }
+      /* 滑走中の視点きりかえ(#act)は、景色を邪魔しないよう小さく半透明にして右上の隅へ寄せる（ユーザー要望2026-06-26） */
+      body.sliding #act { left: auto; right: calc(3% + env(safe-area-inset-right)); bottom: auto; top: calc(11% + env(safe-area-inset-top));
+        transform: none; padding: 0.8em 1.1em; font-size: clamp(11px,2vw,13px); color: #fdf7ec;
+        background: rgba(74,64,50,0.42); box-shadow: none; opacity: 0.62; } /* 見た目は控えめのまま、指で押せる高さ(約37px)は確保 */
+      body.sliding #act:active { opacity: 0.96; transform: scale(0.94); }
+      /* ── ふわり浮遊（風船飛行）の操作UI：🎈トグル→浮遊中だけ出る。右下に2列×3段（高度▲▼／ズーム＋−／速さ・主観）＝右親指だけで全部届く・横画面でも崩れない。左にステータスメーター（2026-06-23再設計） ── */
+      /* ★空を飛んでいる時の右側のボタン（2026-07-27・ユーザー実機指摘）。
+         旧＝白い文字に rgba(74,98,156,0.55) の薄い青＝晴れた空を背に置くと明暗比 2.88＝読めない。
+         下地を濃くして 6.6 へ。あわせて 66x58 → 56x50 に縮める＝空を見渡すのが目的の場面で
+         画面の1/6を6個のボタンが占めていた（指で押せる44pxは十分に超えている）。 */
+      #fl-up, #fl-down, #fl-zin, #fl-zout, #fl-speed, #fl-fpv {
+        appearance: none; cursor: pointer; width: 56px; height: 50px; box-sizing: border-box;
+        border-radius: 14px; font-size: clamp(12px,2.3vw,15px); line-height: 1.1; text-align: center; font-family: inherit; color: #fdf7ec;
+        border: 1.5px solid rgba(226,236,255,0.34); -webkit-backdrop-filter: blur(6px) saturate(1.2); backdrop-filter: blur(6px) saturate(1.2);
+        text-shadow: 0 1px 3px rgba(0,6,20,0.75); background: rgba(38,56,104,0.78); box-shadow: 0 3px 12px rgba(20,28,54,0.34); display: none; z-index: 7; }
+      /* はやさのラベルは「小さな見出し＋値」の2段で、4文字(ゆっくり)でも収まるように（バグ修正・2026-06-29） */
+      #fl-speed { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0; }
+      #fl-speed small { font-size: 10px; opacity: 0.82; line-height: 1; letter-spacing: 0.04em; }
+      #fl-speed b { font-size: clamp(12px,2.3vw,14px); font-weight: 600; font-style: normal; line-height: 1.05; white-space: nowrap; }
+      body.floating #fl-speed { display: flex; }
+      #fl-down { right: calc(5% + env(safe-area-inset-right)); bottom: calc(9% + env(safe-area-inset-bottom)); }
+      #fl-up   { right: calc(5% + env(safe-area-inset-right)); bottom: calc(9% + 68px + env(safe-area-inset-bottom)); }
+      #fl-fpv  { right: calc(5% + env(safe-area-inset-right)); bottom: calc(9% + 136px + env(safe-area-inset-bottom)); }
+      #fl-zout { right: calc(5% + 74px + env(safe-area-inset-right)); bottom: calc(9% + env(safe-area-inset-bottom)); font-size: 28px; }
+      #fl-zin  { right: calc(5% + 74px + env(safe-area-inset-right)); bottom: calc(9% + 68px + env(safe-area-inset-bottom)); font-size: 28px; }
+      #fl-speed{ right: calc(5% + 74px + env(safe-area-inset-right)); bottom: calc(9% + 136px + env(safe-area-inset-bottom)); font-size: clamp(11px,2.2vw,14px); }
+      #fl-fpv.on { background: rgba(66,98,152,0.99); box-shadow: 0 0 0 2px rgba(220,235,255,0.7), 0 3px 12px rgba(30,40,70,0.34); } /* 同上＝白文字が読める濃さ */
+      #fl-up:active, #fl-down:active, #fl-zin:active, #fl-zout:active, #fl-speed:active, #fl-fpv:active { transform: scale(0.93); background: rgba(116,140,196,0.99); }
+      #fl-gauges { left: calc(3% + env(safe-area-inset-left)); top: 30%; display: none; gap: 9px; pointer-events: none; z-index: 7; }
+      .flg { position: relative; width: 14px; height: 100px; border-radius: 8px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.32);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 2px 8px rgba(20,24,40,0.2); overflow: hidden; display: inline-block; vertical-align: top; margin-right: 9px; }
+      .flg-fill { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; transform-origin: bottom center; transform: scaleY(0.5); background: linear-gradient(#eaf5ff, #6aa8e0); transition: transform 0.12s ease; }
+      .flg-lbl { position: absolute; left: -2px; right: -2px; bottom: -19px; text-align: center; font-size: 12px; color: #fdf7ec; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+      body.floating #fl-up, body.floating #fl-down, body.floating #fl-zin, body.floating #fl-zout, body.floating #fl-fpv { display: block; }
+      /* #fl-speed は上の flex 規則で表示（小見出し＋値の2段）。ここで block にすると上書きされるため含めない */
+      body.floating #fl-gauges { display: block; }
+      body.floating #jump, body.floating #zin, body.floating #zout, body.floating #lie, body.floating #bike, body.floating #act, body.floating #npc, body.floating #catch, body.floating #fish, body.floating #hint, body.floating #sleep, body.floating #pm-btn, body.floating #mb-btn, body.floating #senko-btn { display: none !important; } /* 飛行中は📔おもいで/🎆線香花火も隠す＝景色の邪魔をしない（ユーザー指摘2026-07-01） */
+      /* ── 軽量モード（低スペック端末）＝UIのすりガラス(backdrop-filter)を切り、そのぶん不透明度を上げて文字が沈まないように（2026-06-29） ── */
+      body.lowfx #act, body.lowfx #jump, body.lowfx .zbtn, body.lowfx #dock > button,
+      body.lowfx #fl-up, body.lowfx #fl-down, body.lowfx #fl-zin, body.lowfx #fl-zout, body.lowfx #fl-speed, body.lowfx #fl-fpv,
+      body.lowfx .fly-b, body.lowfx .flg { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+      body.lowfx #act { background: var(--ui-amber-flat); }
+      body.lowfx #jump { background: var(--ui-bg-flat); }
+      body.lowfx .zbtn { background: var(--ui-bg3-flat); }
+      body.lowfx #dock > button { background: var(--ui-bg2-flat); }
+      body.lowfx #fl-up, body.lowfx #fl-down, body.lowfx #fl-zin, body.lowfx #fl-zout, body.lowfx #fl-speed, body.lowfx #fl-fpv { background: rgba(36,54,100,0.94); } /* 軽量モードも同じ濃さへ（2026-07-27） */
+      body.lowfx .fly-b { background: rgba(46,52,80,0.9); }
+      body.lowfx .flg { background: rgba(40,44,60,0.5); }
+      /* ── しばらく操作しないと、画面のボタン類がそっと透明に消える（景色に没入できる・どのモード/視点でも・画面に触れると戻る・ユーザー要望2026-06-23）── */
+      #hint, #badge, #act, #jump, #zin, #zout, #look, #dock, #npc, #go, #catch, #fish, #sleep, #set-btn,
+      #fl-up, #fl-down, #fl-zin, #fl-zout, #fl-speed, #fl-fpv, #fl-gauges, #stick,
+      #fly-up, #fly-down, #fly-zin, #fly-zout, #fly-speed, #fly-photo, #fly-exit,
+      #fly-cross, #pin-read, #pin-list, #pin-drop, #pin-clear, #pin-copyall,
+      #mb-btn, #senko-btn, #pm-btn { transition: opacity 0.9s ease; }
+      /* 時刻でうつろう色は、段でカクつかないよう ほんのり時間をかけて追いつかせる（上の opacity と同じ宣言に足す＝後勝ちで消さない）。
+         ※ color（文字の色）だけは わざと入れない＝夕暮れの真ん中で 文字が面と同じ灰色になって読めなくなるのを避けるため、
+           文字は main.js の UI_TINT_SNAP が一瞬で入れ替える（前後どちらでも必ず読める） */
+      #hint, #act, #jump, #zin, #zout, #npc, #go, #catch, #fish, #dock > button, #plan, #stick, #knob {
+        transition: opacity 0.9s ease, background-color 1.2s ease, border-color 1.2s ease, box-shadow 1.2s ease; }
+      @media (prefers-reduced-motion: reduce) {
+        #hint, #act, #jump, #zin, #zout, #npc, #go, #catch, #fish, #dock > button, #plan, #stick, #knob {
+          transition: opacity 0.9s ease; } }
+      body.ui-idle #hint, body.ui-idle #badge, body.ui-idle #act, body.ui-idle #jump, body.ui-idle #zin, body.ui-idle #zout,
+      body.ui-idle #look, body.ui-idle #dock, body.ui-idle #npc, body.ui-idle #go, body.ui-idle #catch, body.ui-idle #fish,
+      body.ui-idle #sleep, body.ui-idle #set-btn, body.ui-idle #fl-up, body.ui-idle #fl-down, body.ui-idle #fl-zin,
+      body.ui-idle #fl-zout, body.ui-idle #fl-speed, body.ui-idle #fl-fpv, body.ui-idle #fl-gauges, body.ui-idle #stick,
+      body.ui-idle #fly-up, body.ui-idle #fly-down, body.ui-idle #fly-zin, body.ui-idle #fly-zout, body.ui-idle #fly-speed,
+      body.ui-idle #fly-photo, body.ui-idle #fly-exit, body.ui-idle #fly-cross, body.ui-idle #pin-read, body.ui-idle #pin-list,
+      body.ui-idle #pin-drop, body.ui-idle #pin-clear, body.ui-idle #pin-copyall,
+      body.ui-idle #mb-btn, body.ui-idle #senko-btn, body.ui-idle #pm-btn {
+        opacity: 0 !important; pointer-events: none !important; } /* 📔おもいで/🎆線香花火/📷カメラも景色モードでそっと消える（触れると戻る・ユーザー指摘2026-07-01） */
+      /* ただし操作ボタンはフェード中でも押せる＝1タップで効く（消えていても押せて、同時にUIが戻る・ユーザー指摘2026-06-26） */
+      body.ui-idle #jump, body.ui-idle #zin, body.ui-idle #zout, body.ui-idle #dock, body.ui-idle #dock > button,
+      body.ui-idle #act, body.ui-idle #npc, body.ui-idle #go, body.ui-idle #catch, body.ui-idle #fish,
+      body.ui-idle #fl-up, body.ui-idle #fl-down, body.ui-idle #fl-zin, body.ui-idle #fl-zout, body.ui-idle #fl-speed, body.ui-idle #fl-fpv {
+        pointer-events: auto !important; }
+      /* 自転車中もジャンプできる（走りながらぴょん・ユーザー要望2026-06-26）＝ジャンプボタンは出したまま */
+      /* 横向きのおすすめ（縦持ちのスマホにだけ・やさしく・閉じれる） */
+      #rotate { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); display: none;
+        padding: 0.5em 1.2em; font-size: clamp(13px,3vw,18px); letter-spacing: 0.06em; color: #fdf7ec;
+        background: rgba(60,66,98,0.85); border-radius: 999px; box-shadow: 0 3px 12px rgba(20,24,40,0.35);
+        transition: opacity 1s ease; }
+      @media (orientation: portrait) and (max-width: 900px) { #rotate { display: block; } }
+      #go { left: 50%; bottom: calc(15% + env(safe-area-inset-bottom)); transform: translateX(-50%); appearance: none; border: none; cursor: pointer;
+        padding: 0.62em 1.7em; font-size: clamp(15px,3vw,22px); font-family: inherit; color: var(--ui-fg); font-weight: 600;
+        background: var(--ui-pale); border-radius: 999px; box-shadow: 0 4px 16px rgba(90,120,70,0.35);
+        border: 2px solid var(--ui-pale-edge); display: none; }
+      #go.near { animation: gopulse 1.3s ease-in-out infinite; background: var(--ui-pale-near); }
+      @keyframes gopulse { 0%,100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.07); } }
+      #fade { position: fixed; inset: 0; background: #0c0d12; opacity: 0; pointer-events: none;
+        transition: opacity 0.45s ease; z-index: 30; }
+      #catch, #fish { left: 50%; bottom: calc(15% + env(safe-area-inset-bottom)); transform: translateX(-50%); appearance: none; border: none; cursor: pointer;
+        padding: 0.55em 1.5em; font-size: clamp(14px,2.8vw,20px); font-family: inherit; color: var(--ui-green-fg);
+        background: var(--ui-green); border-radius: 999px; box-shadow: 0 4px 14px rgba(80,110,70,0.3); display: none; }
+      /* P5：情緒的な台詞(発見/名所の気づき/おまけ等)が“スマホ通知風”の暗いカプセルから、絵日記と同じ世界の質感へ＝クリーム色の紙片＋インク茶の文字 */
+      #toast { left: 50%; top: 13%; transform: translateX(-50%) translateY(-8px); padding: 0.55em 1.45em;
+        font-size: clamp(14px,2.8vw,20px); letter-spacing: 0.05em; color: #3b3024; background: rgba(251,244,228,0.96);
+        border: 1px solid rgba(120,96,58,0.4); border-radius: 7px; box-shadow: 0 4px 14px rgba(60,44,24,0.26); opacity: 0; pointer-events: none;
+        transition: opacity 0.4s ease, transform 0.4s ease; }
+      #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+      /* ── 数え板（開発用・2026-07-25）：iPhoneで落ちる原因を実機で見つけるための小さな数字表示。
+            せってい→🛠→「かずを 画面に 出す」でON。触れないように pointer-events:none。既定は非表示 ── */
+      #memhud { position: fixed; left: calc(3% + env(safe-area-inset-left)); bottom: calc(3% + env(safe-area-inset-bottom));
+        z-index: 39; display: none; pointer-events: none; white-space: pre; padding: 0.5em 0.7em; border-radius: 8px;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11px; line-height: 1.45;
+        color: #e8f2e0; background: rgba(24,30,26,0.62); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+      #memhud.on { display: block; }
+      #memhud b { color: #ffd86b; font-weight: 700; }
+      #memhud i { color: #ff9b8a; font-style: normal; font-weight: 700; }
+      /* 「ねる」は左上の⚙の下へ（横画面で左手の親指の下＝誤爆を避ける・ユーザー要望）。押すと確認の絵日記が出る */
+      #sleep { left: calc(3% + env(safe-area-inset-left)); top: calc(3.5% + 54px + env(safe-area-inset-top)); appearance: none; border: none; cursor: pointer;
+        padding: 0.6em 1.05em; font-size: clamp(12px,2.3vw,16px); font-family: inherit; color: #fdf7ec;
+        background: rgba(60,66,98,0.7); border-radius: 999px; box-shadow: 0 3px 10px rgba(20,24,40,0.3); }
+      /* 夜がふけたら一度だけ、🌙ねるボタンがそっと光る＝一日を終える手だてに気づけるように（数回で自然に止まる） */
+      #sleep.glow { animation: sleepglow 1.8s ease-in-out 5; }
+      @keyframes sleepglow { 0%,100% { box-shadow: 0 3px 10px rgba(20,24,40,0.3); } 50% { box-shadow: 0 0 0 5px rgba(180,196,255,0.4), 0 3px 12px rgba(20,24,40,0.34); } }
+      #diary { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+        background: rgba(20,24,40,0.66); backdrop-filter: blur(2px); z-index: 20; }
+      .diary-page { width: min(88vw, 560px); max-height: 86vh; overflow: auto; padding: 1.3em 1.6em 1.6em;
+        background: #fbf6ea; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); text-align: center;
+        background-image: linear-gradient(rgba(180,160,120,0.12) 1px, transparent 1px); background-size: 100% 2.1em;
+        opacity: 0; transform: translateY(12px) scale(0.985); transition: opacity 0.45s ease, transform 0.45s ease; } /* 開くとそっと浮かび上がる（会話と揃えた情緒・2026-06-29） */
+      #diary.show .diary-page { opacity: 1; transform: none; }
+      /* 本文は1行ずつ そっと現れる（.inで表示）＝日記を読む“間” */
+      #diary-body .line { opacity: 0; transform: translateY(5px); transition: opacity 0.5s ease, transform 0.5s ease; }
+      #diary-body .line.in { opacity: 1; transform: none; }
+      #diary-title { margin: 0 0 0.6em; font-size: clamp(19px,4vw,28px); color: #4a4032; letter-spacing: 0.08em; }
+      #diary-pic { margin: 0 auto 0.9em; width: min(76%, 360px); border: 5px solid #fff; border-radius: 4px;
+        box-shadow: 0 3px 14px rgba(120,100,70,0.32); transform: rotate(-1.3deg); overflow: visible; background: #eee; }
+      #diary-pic img { display: block; width: 100%; border-radius: 2px; }
+      #diary-body { text-align: left; font-size: clamp(15px,2.8vw,20px); line-height: 2.0; color: #3b3024; max-width: 26em; margin: 0 auto; }
+      #diary-body .line { border-bottom: 1px dashed rgba(150,130,90,0.3); }
+      #diary-close { margin-top: 1.2em; appearance: none; border: none; cursor: pointer; padding: 0.55em 2.2em;
+        font-size: clamp(15px,3vw,21px); font-family: inherit; color: #fdf7ec; background: #6a7088; border-radius: 999px; }
+      /* 「まだ ねない」＝誤って「ねる」を押しても翌日へ進めず元の一日に戻れる（ユーザー要望の戻るボタン） */
+      #diary-cancel { margin-top: 0.7em; appearance: none; border: none; cursor: pointer; padding: 0.45em 1.8em; display: block; margin-left: auto; margin-right: auto;
+        font-size: clamp(13px,2.6vw,17px); font-family: inherit; color: #5a4a36; background: rgba(150,140,118,0.26); border-radius: 999px; }
+      #npc { left: 50%; bottom: calc(15% + env(safe-area-inset-bottom)); transform: translateX(-50%); appearance: none; border: none;
+        cursor: pointer; padding: 0.6em 1.6em; font-size: clamp(14px,2.8vw,20px); font-family: inherit;
+        color: var(--ui-fg2); background: var(--ui-panel); border-radius: 999px;
+        box-shadow: 0 4px 14px rgba(120,100,70,0.3); display: none; }
+      /* 会話中は下の操作ボタン（ドック/ジャンプ/ズーム/文脈アクション）を隠す＝吹き出しと重ならず読みやすい（ユーザー指摘2026-06-29） */
+      body.talking #dock, body.talking #jump, body.talking #zin, body.talking #zout, body.talking #act, body.talking #catch, body.talking #fish { display: none !important; }
+      /* 釣り/虫取り中は、画面中央の主人公に「つる/つかまえる」が思いっきり重なっていた（ユーザー指摘2026-07-01）。
+         →この間は ドック/ジャンプ/ズーム を片づけ、行動ボタンを中央（主人公の上）から 右下の親指の位置へ寄せる＝鑑賞を邪魔せず押しやすい。 */
+      body.busy #dock, body.busy #jump, body.busy #zin, body.busy #zout { display: none !important; }
+      body.busy #catch, body.busy #fish { left: auto; right: calc(5% + env(safe-area-inset-right));
+        bottom: calc(9% + env(safe-area-inset-bottom)); transform: none !important; padding: 0.7em 1.6em; }
+      body.busy #catch:active, body.busy #fish:active { transform: scale(0.95) !important; }
+      #dialogue { left: 50%; bottom: 6%; transform: translateX(-50%) translateY(10px); width: min(86vw, 680px);
+        padding: 0.9em 1.3em 1.1em; background: rgba(255,250,240,0.96); border-radius: 16px;
+        box-shadow: 0 6px 22px rgba(80,66,46,0.35); display: none; cursor: pointer;
+        opacity: 0; transition: opacity 0.32s ease, transform 0.32s ease; } /* 会話の吹き出しはふわっと出る（.showでフェード＋少し上がる・2026-06-29） */
+      #dialogue.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+      #dlg-name { font-size: clamp(12px,2.3vw,16px); color: #8a6a3a; }
+      /* 「▼ つづきはタップ」の合図＝台詞が出切ったらそっと現れて上下に揺れる（タイプ表示中は隠す・2026-06-29） */
+      #dlg-more { position: absolute; right: 14px; bottom: 7px; font-size: 13px; color: #b59a78; opacity: 0;
+        transition: opacity 0.25s ease; animation: dlgmore 1.2s ease-in-out infinite; pointer-events: none; }
+      @keyframes dlgmore { 0%,100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+      #dlg-text { margin: 0.25em 0 0; font-size: clamp(15px,3vw,21px); line-height: 1.6; color: #3b3024; }
+      /* タイトル画面 */
+      #title { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(rgba(40,44,60,0.28), rgba(40,44,60,0.04) 42%, rgba(40,44,60,0.4));
+        z-index: 25; transition: opacity 0.9s ease; }
+      #title.hidden { opacity: 0; pointer-events: none; }
+      /* 起動中（じゅんびちゅう）は不透明のたそがれ色で覆う＝重いシーン構築でメインスレッドが止まる間、透けて見える“空/引き伸ばしのキャンバス＋固まったUI”を隠し「横持ちでUIが崩れる」を防ぐ。準備完了(loading除去)で半透明に戻り本編の絵があらわれる（ユーザー2026-07-07） */
+      #title.loading { background: linear-gradient(165deg, #6e6f8e, #8a6a6a 42%, #c98f63 78%, #e3b07a); }
+      .title-inner { text-align: center; }
+      .t-sub { margin: 0 0 0.4em; font-size: clamp(12px,2.6vw,18px); letter-spacing: 0.26em; text-indent: 0.26em;
+        color: #fdf6e8; text-shadow: 0 1px 6px rgba(40,40,50,0.6); }
+      .t-main { margin: 0 0 1.2em; font-size: clamp(28px,7vw,60px); font-weight: 600; letter-spacing: 0.3em;
+        text-indent: 0.3em; color: #fffaf0; text-shadow: 0 2px 14px rgba(30,30,40,0.65); }
+      #t-start { appearance: none; border: none; cursor: pointer; padding: 0.7em 2.4em; font-size: clamp(16px,3vw,22px);
+        font-family: inherit; color: #4a4032; background: rgba(255,250,240,0.9); border-radius: 999px;
+        box-shadow: 0 4px 16px rgba(120,100,70,0.3); transition: opacity 0.5s ease; }
+      /* B⑩：読み込み中は「じゅんびちゅう…」を淡く・押せない見た目に（準備が終わると「はじめる」へ） */
+      #t-start:disabled { cursor: default; opacity: 0.5; color: #6a6051; box-shadow: 0 2px 8px rgba(120,100,70,0.2); }
+      .t-hint { margin-top: 1.5em; font-size: clamp(11px,2.4vw,15px); color: #e8dcc6; }
+      /* じゅんびの進み具合＝毎回いちばん長く見る画。細い線がそっと伸びるだけ（数字は出さない） */
+      #t-prog { width: min(58vw, 260px); height: 3px; margin: 0.9em auto 0; border-radius: 999px;
+        background: rgba(255,250,240,0.22); overflow: hidden; transition: opacity 0.5s ease; }
+      #t-prog i { display: block; width: 0%; height: 100%; border-radius: 999px;
+        background: linear-gradient(90deg, rgba(255,236,200,0.75), rgba(255,250,240,0.95)); transition: width 0.5s cubic-bezier(0.16,1,0.3,1); }
+      #title:not(.loading) #t-prog { opacity: 0; }
+      @media (prefers-reduced-motion: reduce) { #t-prog, #t-prog i, #t-resume { transition: none; } }
+      /* 「つづきから」＝前にきれいに終えた続きへ戻る（前回の場所・時刻から）。出るのは戻れる時だけ */
+      #t-resume { appearance: none; border: 1px solid rgba(255,250,240,0.55); cursor: pointer; display: none; margin-top: 0.9em;
+        padding: 0.45em 1.6em; font-size: clamp(13px,2.4vw,17px); font-family: inherit; color: #fdf6e8;
+        background: rgba(120,104,80,0.42); border-radius: 999px; transition: opacity 0.4s ease, background 0.2s; }
+      #t-resume.on { display: inline-block; }
+      /* せってい（⚙） */
+      #set-btn { left: calc(3% + env(safe-area-inset-left)); top: calc(3.5% + env(safe-area-inset-top)); appearance: none; border: none; cursor: pointer; width: 44px; height: 44px;
+        border-radius: 50%; font-size: 20px; color: #fdf7ec; background: rgba(74,64,50,0.7);
+        box-shadow: 0 3px 10px rgba(20,24,40,0.3); }
+      /* タイトル中は遊びのHUDを全部隠す（はがき構図に集中・ユーザー要望2026-06-23） */
+      body.titling #sleep, body.titling #badge, body.titling #set-btn, body.titling #hint, body.titling #look,
+      body.titling #jump, body.titling #zin, body.titling #zout, body.titling #act, body.titling #lie, body.titling #bike,
+      body.titling #float, body.titling #fl-up, body.titling #fl-down,
+      body.titling #npc, body.titling #catch, body.titling #fish, body.titling #go { display: none !important; }
+      /* 設定カードの右上の×（縦が短い横持ちでもスクロール不要で必ず閉じられる） */
+      #set-x { position: absolute; top: 8px; right: 10px; appearance: none; border: none; cursor: pointer; width: 44px; height: 44px;
+        border-radius: 50%; font-size: 22px; line-height: 1; color: #6a5c46; background: rgba(150,140,118,0.22); }
+      #set-x:active { background: rgba(150,140,118,0.4); }
+      .set-card { position: relative; }
+      #settings { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+        background: rgba(24,28,42,0.62); backdrop-filter: blur(3px); z-index: 28; }
+      #settings.on { display: flex; }
+      .set-card { box-sizing: border-box; width: min(86vw, 420px); max-height: 88dvh; display: flex; flex-direction: column; overflow: hidden; padding: 1.4em 1.6em 1.3em; background: #fbf6ea; border-radius: 16px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.4); text-align: center; }
+      .set-card h2 { margin: 0 0 0.8em; font-size: clamp(19px,4.2vw,26px); color: #4a4032; letter-spacing: 0.1em; }
+      /* ── たんす式せってい（A案・2026-07-12）：中身だけスクロール＋引き出しの開閉 ── */
+      /* ★指は「まっすぐ下」には動かない＝少しでも斜めに動くと横にも流れ、カードが画面の外へずれて
+         真ん中へ戻すのが手間だった（ユーザー指摘2回目・2026-07-27）。縦だけに動くよう固定する。
+         touch-action:pan-y＝ブラウザに「この指の動きは縦スクロールだけ」と伝える（横の慣性ごと止まる）。 */
+      .set-body { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch; min-height: 0; }
+      #settings { touch-action: pan-y; }
+      .set-card { touch-action: pan-y; }
+      /* 「あそびかたを みる」＝引き出しを全部あけると画面の外に出て届かなかったので、スクロールする側の一番上へ（2026-07-25） */
+      #set-guide { display: block; width: 100%; min-height: 44px; margin: 0 0 0.5em; appearance: none; cursor: pointer;
+        border: 1px solid rgba(150,130,90,0.3); border-radius: 12px; padding: 0.55em 0.85em;
+        font: inherit; font-size: clamp(14px,3vw,17px); color: #4a4032; background: rgba(255,246,224,0.9); letter-spacing: 0.04em; }
+      #set-guide:active { background: rgba(246,232,198,0.95); }
+      #settings.on .set-card { animation: setPop 200ms cubic-bezier(0.16, 1, 0.3, 1); }
+      @keyframes setPop { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+      .set-group { margin: 0.42em 0; border: 1px solid rgba(150,130,90,0.22); border-radius: 12px; background: rgba(255,252,244,0.65); overflow: hidden; }
+      .set-g-h { appearance: none; border: none; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.6em;
+        padding: 0.6em 0.85em; background: transparent; font: inherit; font-size: clamp(14px,3vw,17px); color: #4a4032; letter-spacing: 0.04em; text-align: left; }
+      .set-g-h:active { background: rgba(150,140,118,0.14); }
+      .set-chev { font-style: normal; color: #9a8f78; transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1); }
+      .set-group.open .set-chev { transform: rotate(180deg); }
+      .set-g-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 240ms cubic-bezier(0.16, 1, 0.3, 1); }
+      .set-group.open .set-g-body { grid-template-rows: 1fr; }
+      .set-g-inner { min-height: 0; overflow: hidden; padding: 0 0.85em; }
+      .set-g-inner .set-row:last-child { margin-bottom: 0.75em; }
+      @media (prefers-reduced-motion: reduce) { .set-g-body, .set-chev { transition: none; } #settings.on .set-card { animation: none; } }
+      /* いまの時刻＝古い柱時計（クリーム面・茶色の枠と針）。本家のように今が何時か分かる */
+      #set-clock { display: flex; flex-direction: column; align-items: center; gap: 0.3em; margin: 0 0 0.9em; }
+      #set-clock-face { width: clamp(82px, 22vw, 104px); height: clamp(82px, 22vw, 104px); }
+      #set-clock .clk-rim { fill: #b89a6a; }
+      #set-clock .clk-face { fill: #fcf7ec; }
+      #set-clock .clk-ticks line { stroke: #7a6a4e; stroke-width: 2; stroke-linecap: round; }
+      #set-clock .clk-hand-h { stroke: #4a4032; stroke-width: 4; stroke-linecap: round; }
+      #set-clock .clk-hand-m { stroke: #5a4f3e; stroke-width: 2.6; stroke-linecap: round; }
+      #set-clock .clk-pin { fill: #c2562f; }
+      #set-clock-label { font-size: clamp(14px,3vw,18px); color: #6a5e48; letter-spacing: 0.06em; }
+      @media (orientation: landscape) and (max-height: 460px) { #set-clock { flex-direction: row; gap: 0.7em; margin-bottom: 0.5em; } #set-clock-face { width: 64px; height: 64px; } }
+      /* 開発・実験用＝残すが目立たせない（小さく・薄く・下に。触れば不透明に戻る） */
+      .set-dev { opacity: 0.55; transition: opacity 0.2s; border-style: dashed; } /* たんす式＝グループ枠に馴染ませる（点線枠＋薄め・2026-07-12） */
+      .set-dev:hover, .set-dev:focus-within { opacity: 0.92; }
+      .set-dev .set-row { font-size: clamp(12px,2.4vw,14px); margin: 0.35em 0; }
+      .set-dev .set-toggle { min-width: 64px; padding: 0.3em 0.7em; font-size: clamp(11px,2.2vw,13px); }
+      .set-dev { display: none; } /* A4：開発ツールは本番では隠す。body.dev-on（タイトル5連打 or ?dev=1）の時だけ表示 */
+      body.dev-on .set-dev { display: block; }
+      .set-row { display: flex; align-items: center; justify-content: space-between; gap: 1em; margin: 0.7em 0;
+        font-size: clamp(15px,3vw,19px); color: #3b3024; }
+      /* ★flexの中の文字は min-width:auto のせいで縮まず、行が箱より横に広がる（実測32pxはみ出し）＝
+         はみ出した分だけ横に流れて「斜めスクロール」の元になる。min-width:0 と折り返しで内側に収める。
+         （共通規約 ui-polish-conventions §4＝過去にiOSで2回再発した実害。ここでも同じ穴だった） */
+      .set-row > span { min-width: 0; overflow-wrap: anywhere; }
+      .set-toggle, .set-row > button { flex: 0 0 auto; }
+      .set-toggle { appearance: none; border: none; cursor: pointer; min-width: 84px; padding: 0.4em 1em; border-radius: 999px;
+        font-size: clamp(13px,2.6vw,16px); font-family: inherit; color: #fff; background: #9aa0ae; transition: background 0.2s; }
+      .set-toggle.on { background: #4e7a44; } /* 白い「ON」の字が読める濃さへ（#7aa86aは明暗比2.7で読みにくかった・2026-07-26） */
+      /* 「とじる」はスクロールする側の最後にあり、下までスクロールしないと出てこなかった（2026-07-25）。
+         下に貼り付けて、いつでも見えている状態にする（×は右上に別途あるが、大きく押せる とじる が常にある方が親切） */
+      /* ★横幅を「箱＋3.2em」にして負の余白で端まで伸ばしていたが、そのぶん中身が箱より32px広くなり、
+         指が斜めに動いた時に横へ流れる元になっていた（2026-07-27の操作巡回で発覚）。
+         箱に収まる幅にする＝スクロールする中身が横にはみ出さない。見た目は角を丸めて自然に。 */
+      #set-close { position: sticky; bottom: 0; display: block; width: 100%; margin: 1.4em 0 0; appearance: none; border: none; cursor: pointer;
+        padding: 0.62em 0; border-radius: 12px; font-size: clamp(15px,3vw,20px); font-family: inherit; color: #fdf7ec; background: #6a7088;
+        box-shadow: 0 -10px 14px rgba(251,246,234,0.95); }
+      /* はじめてのあそびかた（初回だけ・やさしく） */
+      #guide { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+        background: rgba(24,28,42,0.62); backdrop-filter: blur(3px); z-index: 27; }
+      #guide.on { display: flex; }
+      .guide-card { width: min(86vw, 460px); max-height: 90dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 1.5em 1.6em 1.4em; background: #fbf6ea; border-radius: 16px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.4); text-align: center;
+        background-image: linear-gradient(rgba(180,160,120,0.10) 1px, transparent 1px); background-size: 100% 2.0em; }
+      .guide-card h2 { margin: 0 0 0.7em; font-size: clamp(20px,4.5vw,28px); color: #4a4032; letter-spacing: 0.1em; }
+      .guide-row { display: flex; align-items: center; gap: 0.7em; text-align: left; margin: 0.55em 0;
+        font-size: clamp(14px,3vw,18px); color: #3b3024; line-height: 1.4; }
+      .guide-row .ic { flex: none; width: 1.7em; height: 1.7em; display: flex; align-items: center; justify-content: center;
+        font-size: 1.2em; background: rgba(120,150,110,0.16); border-radius: 50%; }
+      #guide-ok { margin-top: 1.3em; appearance: none; border: none; cursor: pointer; padding: 0.6em 2.4em;
+        font-size: clamp(16px,3.2vw,21px); font-family: inherit; color: #3b4a2e; font-weight: 600;
+        background: rgba(236,248,224,0.98); border: 2px solid rgba(150,180,120,0.7); border-radius: 999px;
+        box-shadow: 0 4px 14px rgba(90,120,70,0.3); }
+      /* ぷにコン（指で動かす仮想スティック） */
+      #stick { position: fixed; width: 132px; height: 132px; margin: -66px 0 0 -66px;
+        border-radius: 50%; background: var(--ui-stick);
+        border: 2px solid var(--ui-stick-edge); display: none; pointer-events: none; z-index: 5; }
+      #knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px;
+        margin: -28px 0 0 -28px; border-radius: 50%; background: var(--ui-knob);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
+      /* ── ばしょマップ（開発中だけの“場所をつたえる”道具・ユーザー要望。完成したら外す）── */
+      #set-map { background: #c8956a; } /* せってい内の「ひらく」ボタン＝道具らしい色 */
+      #mapui { position: fixed; inset: 0; display: none; z-index: 32; box-sizing: border-box; overflow: auto;
+        align-items: center; justify-content: center; gap: 14px; padding: 12px; flex-wrap: wrap;
+        background: rgba(24,28,42,0.84); backdrop-filter: blur(3px); }
+      #mapui.on { display: flex; }
+      #map-wrap { position: relative; background: #f3ead6; border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+      #map-cv { display: block; border-radius: 12px; touch-action: none; cursor: crosshair; }
+      #map-compass { position: absolute; left: 8px; top: 6px; font-size: 13px; font-weight: 600;
+        color: #6a5a3a; text-shadow: 0 1px 2px rgba(255,251,243,0.8); pointer-events: none; }
+      #map-panel { width: min(92vw, 304px); max-height: 88vh; overflow: auto; padding: 14px 15px 15px;
+        background: #fbf6ea; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+      #map-panel h2 { margin: 0 0 0.5em; font-size: clamp(18px,3.6vw,22px); color: #4a4032; letter-spacing: 0.06em; }
+      .map-help { margin: 0 0 0.8em; font-size: 13px; line-height: 1.6; color: #6a5c46; }
+      .map-modes { display: flex; gap: 6px; margin-bottom: 4px; }
+      .map-mode { flex: 1; appearance: none; border: none; cursor: pointer; padding: 0.5em 0; border-radius: 999px;
+        font-size: 15px; font-family: inherit; color: #5a4a36; background: #e3dac6; transition: background 0.2s; }
+      .map-mode.on { background: #4e7a44; color: #fff; } /* 同上＝白文字が読める濃さ */
+      .map-modehelp { margin: 0.4em 0 0.9em; font-size: 12px; line-height: 1.5; color: #8a7a5e; }
+      .map-btn { display: block; width: 100%; appearance: none; border: none; cursor: pointer; margin: 7px 0;
+        padding: 0.62em 1em; border-radius: 12px; font-size: 16px; font-family: inherit; color: #4a4032;
+        background: rgba(150,140,118,0.2); box-shadow: 0 2px 6px rgba(120,100,70,0.14); }
+      #map-here { color: #2e5a2e; background: rgba(232,246,228,0.96); font-weight: 600;
+        border: 2px solid rgba(150,180,120,0.6); }
+      #map-copy { color: #fdf7ec; background: #7aa86a; font-weight: 600; }
+      #map-share { color: #fdf7ec; background: #6a86c0; font-weight: 600; }
+      #map-out { width: 100%; box-sizing: border-box; min-height: 78px; margin: 8px 0 2px; padding: 8px 10px;
+        font-family: inherit; font-size: 12.5px; line-height: 1.6; color: #3b3024; background: #fffdf7;
+        border: 1px solid rgba(150,130,90,0.3); border-radius: 10px; resize: vertical; }
+      .map-sub { display: flex; gap: 7px; }
+      .map-sub .map-btn { margin: 7px 0; }
+      #map-close { color: #fdf7ec; background: #6a7088; }
+      /* ── 飛行モード（開発用・あとで外す。空を自由に飛んで景色を見る／写真）── */
+      #set-fly { background: #6a86c0; }
+      #flyui { position: fixed; inset: 0; display: none; pointer-events: none; z-index: 8; }
+      #flyui.on { display: block; }
+      /* 開発時(body.dev-on)に浮遊(風船)へ入ると、飛行専用の上昇/速さ/写真/もどるは浮遊の🎈UIと重なるので隠す（実際に飛ぶのは浮遊の🎈UI） */
+      body.dev-float #fly-up, body.dev-float #fly-down, body.dev-float #fly-zin, body.dev-float #fly-zout,
+      body.dev-float #fly-speed, body.dev-float #fly-photo, body.dev-float #fly-exit { display: none !important; }
+      /* 開発座標モードのトグル（dev-on＋空中＝浮遊/飛行で出る小さなボタン1つ）。既定は通常UIのまま＝開発UIは出さない。押すとbody.dev-coordが付き座標UIが出る・ユーザー要望2026-06-29 */
+      #devcoord-btn { display: none; }
+      body.dev-aerial #devcoord-btn { display: block; position: fixed; pointer-events: auto; z-index: 10;
+        left: calc(3% + env(safe-area-inset-left)); top: calc(3.5% + env(safe-area-inset-top) + 52px);
+        appearance: none; border: none; cursor: pointer; font-family: inherit; color: #fdf7ec;
+        background: rgba(60,66,98,0.6); border-radius: 12px; padding: 0.4em 0.7em; font-size: 13px; line-height: 1.2; }
+      #devcoord-btn.on { background: rgba(60,90,150,0.92); }
+      body.ui-idle #devcoord-btn { opacity: 0 !important; pointer-events: none !important; }
+      /* 座標UI（十字・座標・ピン・コピー・消す）はトグルON(body.dev-coord)の時だけ出す。OFF＝通常UIのまますっきり（浮遊も飛行も既定はOFF） */
+      #fly-cross, #pin-read, #pin-list, #pin-drop, #pin-clear, #pin-copyall { display: none; }
+      body.dev-coord #fly-cross, body.dev-coord #pin-read,
+      body.dev-coord #pin-drop, body.dev-coord #pin-clear, body.dev-coord #pin-copyall { display: block; }
+      body.dev-coord #pin-list:not(:empty) { display: block; }
+      body.flying #jump, body.flying #act, body.flying #lie, body.flying #sleep, body.flying #npc,
+      body.flying #catch, body.flying #fish, body.flying #go, body.flying #zin, body.flying #zout,
+      body.flying #hint, body.flying #look { display: none !important; }
+      .fly-b { position: fixed; pointer-events: auto; appearance: none; cursor: pointer; font-family: inherit;
+        color: #fdf7ec; background: rgba(46,52,80,0.55); border: 1.5px solid rgba(255,255,255,0.46); border-radius: 16px;
+        -webkit-backdrop-filter: blur(6px) saturate(1.2); backdrop-filter: blur(6px) saturate(1.2);
+        text-shadow: 0 1px 3px rgba(10,14,30,0.6); box-shadow: 0 3px 12px rgba(20,24,40,0.26);
+        font-size: clamp(12px,2.4vw,16px); line-height: 1.2; text-align: center; }
+      .fly-b:active { transform: scale(0.93); background: rgba(82,90,126,0.7); }
+      /* 速さボタン＝小見出し＋値（4文字ラベルでも収める・float と統一・2026-06-29） */
+      #fly-speed { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 0; }
+      #fly-speed small { font-size: 10px; opacity: 0.82; line-height: 1; letter-spacing: 0.04em; }
+      #fly-speed b { font-size: clamp(13px,2.4vw,15px); font-weight: 600; font-style: normal; line-height: 1.05; white-space: nowrap; }
+      #fly-up { right: calc(5% + env(safe-area-inset-right)); bottom: calc(9% + 150px + env(safe-area-inset-bottom)); width: 76px; height: 64px; }
+      #fly-down { right: calc(5% + env(safe-area-inset-right)); bottom: calc(9% + 78px + env(safe-area-inset-bottom)); width: 76px; height: 64px; }
+      #fly-zin { right: calc(5% + 12px + env(safe-area-inset-right)); bottom: calc(9% + env(safe-area-inset-bottom)); width: 52px; height: 52px; border-radius: 50%; font-size: 26px; }
+      #fly-zout { right: calc(5% + 78px + env(safe-area-inset-right)); bottom: calc(9% + env(safe-area-inset-bottom)); width: 52px; height: 52px; border-radius: 50%; font-size: 26px; }
+      #fly-speed { left: calc(3% + env(safe-area-inset-left)); bottom: calc(9% + env(safe-area-inset-bottom)); width: 92px; height: 58px; }
+      #fly-photo { left: 50%; bottom: calc(9% + env(safe-area-inset-bottom)); transform: translateX(-50%); width: 66px; height: 66px; border-radius: 50%; font-size: 30px; }
+      #fly-photo:active { transform: translateX(-50%) scale(0.93); }
+      #fly-exit { left: 50%; top: calc(3.5% + env(safe-area-inset-top)); transform: translateX(-50%); padding: 0.5em 1.2em; background: rgba(74,64,50,0.78); }
+      /* ピンで座標登録（開発用・飛行中）：画面中央の十字のところの (x,z) を読む＋📍で印を置く */
+      #fly-cross { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 28px; height: 28px; pointer-events: none; z-index: 9; }
+      #fly-cross::before, #fly-cross::after { content: ''; position: absolute; background: rgba(255,255,255,0.92); box-shadow: 0 0 3px rgba(0,0,0,0.7); }
+      #fly-cross::before { left: 50%; top: 0; width: 2px; height: 28px; transform: translateX(-50%); }
+      #fly-cross::after { top: 50%; left: 0; height: 2px; width: 28px; transform: translateY(-50%); }
+      #pin-read { position: fixed; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); pointer-events: none; z-index: 9;
+        color: #fff; background: rgba(40,44,60,0.72); border-radius: 10px; padding: 2px 11px; font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      #pin-list { position: fixed; left: calc(3% + env(safe-area-inset-left)); top: calc(11% + env(safe-area-inset-top)); pointer-events: none; z-index: 9;
+        color: #fff; background: rgba(40,44,60,0.6); border-radius: 10px; padding: 6px 11px; font-size: 13px; line-height: 1.55; max-width: 46vw; font-variant-numeric: tabular-nums; }
+      #pin-list:empty { display: none; }
+      .pin-row { display: flex; align-items: center; gap: 7px; margin: 3px 0; pointer-events: auto; }
+      .pin-txt { cursor: pointer; pointer-events: auto; white-space: nowrap; }
+      .pin-txt:active { color: #ffd98e; }
+      .pin-del { pointer-events: auto; cursor: pointer; appearance: none; border: none; color: #fff; background: rgba(196,72,58,0.9); border-radius: 6px; width: 24px; height: 24px; font-size: 16px; line-height: 1; padding: 0; flex: none; }
+      .pin-del:active { background: rgba(150,52,42,1); }
+      #pin-drop { left: calc(50% - 150px); bottom: calc(9% + env(safe-area-inset-bottom)); width: 80px; height: 66px; border-radius: 16px; background: rgba(196,72,58,0.86); }
+      #pin-clear { left: calc(50% + 70px); bottom: calc(9% + env(safe-area-inset-bottom)); width: 58px; height: 66px; border-radius: 16px; font-size: 26px; }
+      #pin-copyall { left: calc(50% + 134px); bottom: calc(9% + env(safe-area-inset-bottom)); width: 66px; height: 66px; border-radius: 16px; font-size: 12px; line-height: 1.25; background: rgba(60,90,150,0.86); }
+      /* ── 横持ち(縦が短い)対応：モーダルが画面からはみ出して「閉じる」が見切れる問題を解消（縦余白を詰める＋カードは内部スクロール。max-heightと併用）── */
+      @media (max-height: 540px) {
+        .set-card, .guide-card { padding: 0.8em 1.2em 0.85em; max-height: 94dvh; }
+        .set-g-h { padding: 0.45em 0.75em; } /* 横持ちの低い画面＝引き出し見出しを少し詰める（2026-07-12） */
+        .set-card h2, .guide-card h2 { margin-bottom: 0.4em; font-size: clamp(17px,3.4vw,22px); }
+        .set-row { margin: 0.4em 0; font-size: clamp(13px,2.6vw,17px); }
+        .set-toggle { padding: 0.32em 0.9em; }
+        .guide-row { margin: 0.32em 0; }
+        #set-close, #guide-ok { margin-top: 0.65em; padding-top: 0.5em; padding-bottom: 0.5em; }
+        .diary-page { padding: 0.9em 1.3em 1.1em; }
+      }
+      /* ── 横持ちのとき下端の操作ボタンを画面端ぎりぎりから少し上げ、親指で押しやすく（9%だと縦が短い横画面で下に寄りすぎる）── */
+      @media (orientation: landscape) and (max-height: 540px) {
+        #jump { bottom: calc(16px + env(safe-area-inset-bottom)); }
+        #dock { bottom: calc(12px + env(safe-area-inset-bottom)); }
+        #act, #npc, #catch, #fish, #go { bottom: calc(92px + env(safe-area-inset-bottom)); }
+        #zout { bottom: calc(104px + env(safe-area-inset-bottom)); }
+        #zin { bottom: calc(164px + env(safe-area-inset-bottom)); }
+        #fl-down, #fl-zout { bottom: calc(16px + env(safe-area-inset-bottom)); }
+        #fl-up, #fl-zin { bottom: calc(84px + env(safe-area-inset-bottom)); }
+        #fl-fpv, #fl-speed { bottom: calc(152px + env(safe-area-inset-bottom)); }
+      }
+      /* ── 縦持ちのとき、ジャンプ＋ズームの右下クラスタを少し上げて、中央下のドック(ねころぶ/🚲/🎈)と重ならないようにする（横持ちが主・縦は副だが指の誤爆を防ぐ・UI監査2026-06-26）── */
+      @media (orientation: portrait) {
+        #jump { bottom: calc(165px + env(safe-area-inset-bottom)); }
+        #zout { bottom: calc(255px + env(safe-area-inset-bottom)); }
+        #zin { bottom: calc(315px + env(safe-area-inset-bottom)); }
+      }
+    </style>
+    <script type="module" crossorigin src="/hitonatsu/assets/proto3d-By4VsDnV.js"></script>
+    <link rel="modulepreload" crossorigin href="/hitonatsu/assets/audioAssets-COSmQMZ0.js">
+    <link rel="modulepreload" crossorigin href="/hitonatsu/assets/three.module-2jsFzF-S.js">
+    <link rel="modulepreload" crossorigin href="/hitonatsu/assets/BufferGeometryUtils-LSF0Veaf.js">
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="hint" class="hud">左で歩く ／ 右で見回す ／ ボタンでジャンプ・ズーム</div>
+    <div id="badge" class="hud">なつやすみ</div>
+    <button id="jump" class="hud">ジャンプ</button>
+    <button id="zin" class="hud zbtn">＋</button>
+    <button id="zout" class="hud zbtn">－</button>
+    <button id="act" class="hud">すわる</button>
+    <button id="plan" class="hud">まどり</button>
+    <div id="dock" class="hud"><button id="lie"><b>🌿</b><i>ねころぶ</i></button><button id="bike" aria-label="じてんしゃ"><b>🚲</b><i>のる</i></button><button id="float" aria-label="ふわり とぶ"><b>🎈</b><i>とぶ</i></button><button id="fpvbtn" aria-label="主観視点（一人称で見わたす）"><b>🔭</b><i>しゅかん</i></button></div>
+    <button id="fl-up" class="hud">▲<br>うく</button>
+    <button id="fl-down" class="hud">▼<br>おりる</button>
+    <button id="fl-zin" class="hud">＋</button>
+    <button id="fl-zout" class="hud">－</button>
+    <button id="fl-speed" class="hud">はやさ<br>ふつう</button>
+    <button id="fl-fpv" class="hud">主観<br>視点</button>
+    <!-- 飛行中のステータスメーター（高度・速さ・ズーム）。今どの状態かが一目でわかる -->
+    <div id="fl-gauges" class="hud">
+      <div class="flg"><div class="flg-fill" id="flg-alt"></div><span class="flg-lbl">高</span></div>
+      <div class="flg"><div class="flg-fill" id="flg-spd"></div><span class="flg-lbl">速</span></div>
+      <div class="flg"><div class="flg-fill" id="flg-zoom"></div><span class="flg-lbl">寄</span></div>
+    </div>
+    <div id="look" class="hud">スワイプで見回す ・ もう一度タップで立つ</div>
+    <div id="rotate" class="hud">横にすると、もっと広く見渡せます</div>
+    <button id="npc" class="hud">はなしかける</button>
+    <div id="dialogue" class="hud"><span id="dlg-name"></span><p id="dlg-text"></p><span id="dlg-more" aria-hidden="true">▼</span></div>
+    <button id="go" class="hud">町へ →</button>
+    <div id="fade"></div>
+    <button id="catch" class="hud">つかまえる</button>
+    <button id="fish" class="hud">つる</button>
+    <div id="toast" class="hud"></div>
+    <!-- 数え板（開発用）：メモリの様子を歩きながら見る。せってい→🛠→「かずを 画面に 出す」 -->
+    <div id="memhud"></div>
+    <button id="sleep" class="hud">🌙 ねる</button>
+    <div id="diary">
+      <div class="diary-page">
+        <h2 id="diary-title">えにっき</h2>
+        <div id="diary-pic"></div>
+        <div id="diary-body"></div>
+        <button id="diary-close">おやすみ</button>
+        <button id="diary-cancel">まだ ねない</button>
+      </div>
+    </div>
+    <div id="stick"><div id="knob"></div></div>
+    <!-- 飛行モードのボタン（開発用・飛行中だけ出る） -->
+    <div id="flyui">
+      <button id="fly-up" class="fly-b">▲<br>上昇</button>
+      <button id="fly-down" class="fly-b">▼<br>下降</button>
+      <button id="fly-zin" class="fly-b">＋</button>
+      <button id="fly-zout" class="fly-b">－</button>
+      <button id="fly-speed" class="fly-b">速さ<br>ふつう</button>
+      <button id="fly-photo" class="fly-b">📷</button>
+      <button id="fly-exit" class="fly-b">✕ もどる</button>
+      <button id="devcoord-btn">📐 座標</button>
+      <div id="fly-cross"></div>
+      <div id="pin-read">＋ ----</div>
+      <div id="pin-list"></div>
+      <button id="pin-drop" class="fly-b">📍<br>ピン</button>
+      <button id="pin-clear" class="fly-b">🗑</button>
+      <button id="pin-copyall" class="fly-b">📋<br>全部<br>コピー</button>
+    </div>
+    <button id="set-btn" class="hud" title="せってい">⚙</button>
+    <div id="settings">
+      <div class="set-card">
+        <button id="set-x" aria-label="とじる">×</button>
+        <h2>せってい</h2>
+        <div class="set-body"><!-- 中身だけスクロール＝×とタイトルは常に見える（2026-07-12） -->
+        <!-- いまの時刻（柱時計）＝本家のように、いつでも今が何時か分かる -->
+        <div id="set-clock" aria-label="いまの時刻">
+          <svg viewBox="0 0 100 100" id="set-clock-face" aria-hidden="true">
+            <circle cx="50" cy="50" r="47" class="clk-rim"/>
+            <circle cx="50" cy="50" r="42" class="clk-face"/>
+            <g class="clk-ticks">
+              <line x1="50" y1="6" x2="50" y2="13" transform="rotate(0 50 50)"/>
+              <line x1="50" y1="8" x2="50" y2="12" transform="rotate(30 50 50)"/>
+              <line x1="50" y1="8" x2="50" y2="12" transform="rotate(60 50 50)"/>
+              <line x1="50" y1="6" x2="50" y2="13" transform="rotate(90 50 50)"/>
+              <line x1="50" y1="8" x2="50" y2="12" transform="rotate(120 50 50)"/>
+              <line x1="50" y1="8" x2="50" y2="12" transform="rotate(150 50 50)"/>
+              <line x1="50" y1="6" x2="50" y2="13" transform="rotate(180 50 50)"/>
+              <line x1="50" y1="8" x2="50" y2="12" transform="rotate(210 50 50)"/>
+              <line x1="50" y1="8" x2="50" y2="12" transform="rotate(240 50 50)"/>
+              <line x1="50" y1="6" x2="50" y2="13" transform="rotate(270 50 50)"/>
+              <line x1="50" y1="8" x2="50" y2="12" transform="rotate(300 50 50)"/>
+              <line x1="50" y1="8" x2="50" y2="12" transform="rotate(330 50 50)"/>
+            </g>
+            <line id="clk-h" x1="50" y1="56" x2="50" y2="31" class="clk-hand-h"/>
+            <line id="clk-m" x1="50" y1="58" x2="50" y2="20" class="clk-hand-m"/>
+            <circle cx="50" cy="50" r="3" class="clk-pin"/>
+          </svg>
+          <div id="set-clock-label">—</div>
+        </div>
+        <button id="set-guide">あそびかたを みる</button>
+        <!-- たんす式（A案・2026-07-12）：6つの引き出しに整理。開くのは常に1つ＝メニューが短いまま。既存idは全部そのまま＝ハンドラ不変 -->
+        <div class="set-group">
+          <button class="set-g-h" type="button">🔊 おと<i class="set-chev">▾</i></button>
+          <div class="set-g-body"><div class="set-g-inner">
+            <div class="set-row"><span>おと（環境音・効果音）</span><button class="set-toggle" id="set-sound">ON</button></div>
+            <div class="set-row"><span>おんがく（オルゴール・夜や雨の しらべ）</span><button class="set-toggle" id="set-bgm">ON</button></div>
+          </div></div>
+        </div>
+        <div class="set-group">
+          <button class="set-g-h" type="button">🎮 そうさ・カメラ<i class="set-chev">▾</i></button>
+          <div class="set-g-body"><div class="set-g-inner">
+            <div class="set-row"><span>見まわす はやさ</span><button class="set-toggle on" id="set-sens">ふつう</button></div>
+            <div class="set-row"><span>画面のゆれを へらす</span><button class="set-toggle" id="set-motion">OFF</button></div>
+            <div class="set-row"><span>主観視点（一人称で見わたす）</span><button class="set-toggle" id="set-fpv">OFF</button></div>
+            <div class="set-row"><span>🎮 コントローラーのボタン（割当を見る・変える）</span><button class="set-toggle" id="set-pad">ひらく</button></div>
+          </div></div>
+        </div>
+        <div class="set-group">
+          <button class="set-g-h" type="button">🔋 かるさ・でんち<i class="set-chev">▾</i></button>
+          <div class="set-g-body"><div class="set-g-inner">
+            <div class="set-row"><span>中くらいモード（線は残して 少し軽く・暑い時に）</span><button class="set-toggle" id="set-med">OFF</button></div>
+            <div class="set-row"><span>軽量モード（カクつく時・線とボケを省いて軽く）</span><button class="set-toggle" id="set-light">OFF</button></div>
+            <div class="set-row"><span>ひかりの しあげを 半分に（見た目ほぼそのまま・あついとき）</span><button class="set-toggle" id="set-posthalf">OFF</button></div>
+            <div class="set-row"><span>安全モード（起動できない・すぐ再起動する時。人をシンプルにして いちばん軽く）</span><button class="set-toggle" id="set-safe">OFF</button></div>
+            <div class="set-row"><span>ひらき直す（画面がおかしくなった時・いまの場所から戻ります）</span><button class="set-toggle" id="set-reload">ひらき直す</button></div>
+          </div></div>
+        </div>
+        <div class="set-group">
+          <button class="set-g-h" type="button">🎨 えの みため<i class="set-chev">▾</i></button>
+          <div class="set-g-body"><div class="set-g-inner">
+            <div class="set-row"><span>文字を 大きく（読みやすく・画面が小さい時に）</span><button class="set-toggle" id="set-bigtext">OFF</button></div>
+            <div class="set-row"><span>手描きの線（おもいとき OFF）</span><button class="set-toggle on" id="set-ink">ON</button></div>
+            <div class="set-row"><span>主人公のすがた（あたらしい男の子 ⇄ むかしの姿）</span><button class="set-toggle on" id="set-vrmboy">あたらしい</button></div>
+            <div class="set-row"><span>むかしの田舎に寄せる（実験・いつでも戻せます）</span><button class="set-toggle" id="set-village">忠実</button></div>
+            <div class="set-row"><span>キャラのデータを本体に保存（機内モードでもVRM・押すと今すぐ）</span><button class="set-toggle" id="set-vrmdl">かくにん中…</button></div>
+          </div></div>
+        </div>
+        <div class="set-group">
+          <button class="set-g-h" type="button">🏠 はじまり・おでかけ<i class="set-chev">▾</i></button>
+          <div class="set-g-body"><div class="set-g-inner">
+            <div class="set-row"><span>はじまりの場所（いまいる所にする）</span><button class="set-toggle" id="set-spawn">ここにする</button></div>
+            <div class="set-row"><span>はじまりの場所を 標準にもどす</span><button class="set-toggle" id="set-spawn-reset">もどす</button></div>
+            <div class="set-row"><span>🧭 おでかけモード（ほんものの獅子ヶ谷を歩くと、ゲームのじぶんも歩く・位置情報を使います）</span><button class="set-toggle" id="set-geo">OFF</button></div>
+            <div class="set-row"><span>🧭 位置あわせ（ずれたとき・いまの場所をここにする）</span><button class="set-toggle" id="set-geo-cal">あわせる</button></div>
+          </div></div>
+        </div>
+        <!-- 開発・実験用：本番では隠す（A4）。表示は「せってい」の見出し5回タップ/長押し か ?dev=1 のとき（body.dev-on） -->
+        <div class="set-group set-dev">
+          <button class="set-g-h" type="button">🛠 開発・実験用<i class="set-chev">▾</i></button>
+          <div class="set-g-body"><div class="set-g-inner">
+            <div class="set-row"><span>🗺 ばしょマップ（場所をつたえる）</span><button class="set-toggle" id="set-map">ひらく</button></div>
+            <div class="set-row"><span>🔢 かずを 画面に 出す（メモリの様子・落ちる原因さがし）</span><button class="set-toggle" id="set-memhud">OFF</button></div>
+            <div class="set-row"><span>🏢 ビエント横濱菊名へ（確認用）</span><button class="set-toggle" id="set-biento" style="background:#c8956a">いく</button></div>
+            <div class="set-row"><span>✈ 飛んでみる（開発用）</span><button class="set-toggle" id="set-fly">とぶ</button></div>
+          </div></div>
+        </div>
+        <button id="set-close">とじる</button>
+        </div><!-- /.set-body -->
+      </div>
+    </div>
+    <!-- ばしょマップ：開発中だけ、場所をことばや座標でなく“タップ＋コピー”で伝える道具（ユーザー要望） -->
+    <div id="mapui">
+      <div id="map-wrap">
+        <canvas id="map-cv"></canvas>
+        <div id="map-compass">北 ▲</div>
+      </div>
+      <div id="map-panel">
+        <h2>ばしょマップ</h2>
+        <p class="map-help">地図を <b>タップ</b>すると、そこに 印（しるし）が つきます。<br>
+          ゲームで その場所に 立って <b>「いる所に印」</b>を おしても いいです。<br>
+          印を つけたら <b>「コピー」</b>（文字）か <b>「📷 画像にして送る」</b>（地図の絵）で、わたしに 送ってください。</p>
+        <div class="map-modes">
+          <button class="map-mode on" id="map-mode-point" data-mode="point">地点</button>
+          <button class="map-mode" id="map-mode-area" data-mode="area">範囲</button>
+          <button class="map-mode" id="map-mode-line" data-mode="line">道</button>
+        </div>
+        <p class="map-modehelp" id="map-modehelp">「地点」＝1か所をタップ。何個でも置けます。</p>
+        <button class="map-btn" id="map-here">📍 いま いる所に 印</button>
+        <textarea id="map-out" readonly placeholder="（まだ 印が ありません）"></textarea>
+        <button class="map-btn" id="map-copy">コピー する</button>
+        <button class="map-btn" id="map-share">📷 画像にして 送る</button>
+        <div class="map-sub">
+          <button class="map-btn" id="map-undo">ひとつ もどす</button>
+          <button class="map-btn" id="map-clear">ぜんぶ けす</button>
+        </div>
+        <button class="map-btn" id="map-close">とじる</button>
+      </div>
+    </div>
+    <div id="guide">
+      <div class="guide-card">
+        <h2>あそびかた</h2>
+        <div class="guide-row"><span class="ic">👈</span><span>画面の <b>左半分</b>を なぞって あるく</span></div>
+        <div class="guide-row"><span class="ic">👉</span><span>右半分を ドラッグで <b>見まわす</b>・つまんで ズーム</span></div>
+        <div class="guide-row"><span class="ic">⭕</span><span>右下のボタンで <b>ジャンプ</b></span></div>
+        <div class="guide-row"><span class="ic">📷</span><span>カメラで 夏の <b>しゃしん</b>を のこせる</span></div>
+        <div class="guide-row"><span class="ic">🌙</span><span>縁側で「ねる」と <b>えにっき</b>。いく日かの ひと夏を すごそう</span></div>
+        <button id="guide-ok">はじめる！</button>
+      </div>
+    </div>
+    <div id="title" class="loading">
+      <div class="title-inner">
+        <p class="t-sub">― 2000年の夏、あの町へ ―</p>
+        <h1 class="t-main">ひと夏のまち</h1>
+        <button id="t-start" disabled aria-busy="true">じゅんびちゅう…</button>
+        <div id="t-prog"><i></i></div>
+        <button id="t-resume" type="button">つづきから</button>
+        <p class="t-hint">指でスライドして歩く ／ 横画面・音を出してお楽しみください</p>
+      </div>
+    </div>
+    <!-- 更新の自動反映：起動時に最新HTMLを no-store で取得し、今読み込んでいる本体JSと違えばキャッシュを跨いで読み直す。
+         ＝デプロイ後もアプリを開き直すだけで最新になる（GitHub PagesのHTML約10分キャッシュ対策・Service Worker不使用・依存なし）。 -->
+    <script>
+      (function () {
+        try {
+          if (/[?&]u=/.test(location.search)) return; // 直前に自動更新で読み直した直後＝再チェックしない（ループ防止）
+          var tag = document.querySelector('script[type="module"][src*="proto3d-"]');
+          if (!tag) return; // 開発サーバ等（ハッシュ名でない）は対象外
+          var m0 = tag.src.match(/proto3d-[\w-]+\.js/);
+          var loaded = m0 && m0[0];
+          if (!loaded) return;
+          var path = location.pathname; // 例 /hitonatsu/proto3d.html
+          fetch(path + '?cb=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.text(); })
+            .then(function (t) {
+              var m = t.match(/proto3d-[\w-]+\.js/);
+              var latest = m && m[0];
+              if (latest && latest !== loaded) location.replace(path + '?u=' + Date.now()); // 新しい版があれば読み直す
+            })
+            .catch(function () {}); // オフライン等は無視（キャッシュのまま起動）
+        } catch (e) {}
+      })();
+    </script>
+  </body>
+</html>

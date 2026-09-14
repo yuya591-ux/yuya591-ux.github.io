@@ -1,14 +1,131 @@
 <!doctype html>
 <html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- 段2の確認用：同じURL（/hitonatsu/）で配られるかを見る目印。段3で本物のビルドに置き換わる -->
-<meta name="hitonatsu-check" content="dan2-2026-09-14">
-<title>ひと夏の一日</title>
-</head>
-<body style="margin:0; padding:3em 1em; text-align:center; font-family:sans-serif; background:#fdf8ec; color:#4a3f2a;">
-<p>ひと夏の一日</p>
-<p>ただいま準備中です。</p>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>ひと夏の一日</title>
+    <!-- 麦わら帽子のアイコン（コード描画のSVG・外部素材なし） -->
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <!-- ホーム画面に追加するとフルスクリーンで起動する（ブラウザのバーが消える） -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#bfe3f0" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ひと夏" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <script type="module" crossorigin src="/hitonatsu/assets/main-BYeIlW66.js"></script>
+    <link rel="modulepreload" crossorigin href="/hitonatsu/assets/audioAssets-COSmQMZ0.js">
+    <link rel="stylesheet" crossorigin href="/hitonatsu/assets/main-DwibPuO8.css">
+  </head>
+  <body>
+    <!-- 一枚絵の風景を描く土台キャンバス -->
+    <canvas id="scene"></canvas>
+
+    <!-- いま居る場所の名前（場面が変わるとふわっと出る） -->
+    <div id="place-label"></div>
+
+    <!-- 日付と天気（朝にふわっと出る） -->
+    <div id="date-label"></div>
+
+    <!-- 夏の記録（図鑑）を開くボタン -->
+    <button id="record-button" aria-label="夏の記録">🌿 きろく</button>
+
+    <!-- 虫相撲 -->
+    <div id="sumo" class="hidden">
+      <div class="sumo-page">
+        <h2>むしずもう</h2>
+        <p class="sumo-hint">「おす！」を れんだ して 相手を おし出そう</p>
+        <div class="sumo-ring">
+          <span class="sumo-bug">🪲</span>
+          <div class="sumo-bar"><div id="sumo-fill"></div></div>
+          <span class="sumo-bug flip">🪲</span>
+        </div>
+        <button id="sumo-push">おす！</button>
+        <p id="sumo-result"></p>
+        <button id="sumo-close" class="hidden">とじる</button>
+      </div>
+    </div>
+
+    <!-- 夏の記録（採った虫・会った人・歩いた場所） -->
+    <div id="record" class="hidden">
+      <div class="record-page">
+        <h2>なつのきろく</h2>
+        <div id="record-body"></div>
+        <button id="record-close">とじる</button>
+      </div>
+    </div>
+
+    <!-- 近くの虫をつかまえる／人にはなしかける（近づくと出る） -->
+    <button id="catch-prompt" class="hidden">つかまえる</button>
+
+    <!-- 夜、縁側で「ねる」と絵日記へ -->
+    <button id="sleep-prompt" class="hidden">ねる</button>
+
+    <!-- 川辺で釣り -->
+    <button id="fish-prompt" class="hidden">つる</button>
+
+    <!-- 小さなお知らせ（虫をつかまえた 等） -->
+    <div id="toast"></div>
+
+    <!-- 会話ウィンドウ -->
+    <div id="dialogue" class="hidden">
+      <span id="dialogue-name"></span>
+      <p id="dialogue-text"></p>
+      <span id="dialogue-next">▶</span>
+    </div>
+
+    <!-- 夜の絵日記 -->
+    <div id="diary" class="hidden">
+      <div class="diary-page">
+        <h2 id="diary-title">きょうの絵日記</h2>
+        <div id="diary-picture"></div>
+        <div id="diary-body"></div>
+        <button id="diary-close">おやすみ</button>
+      </div>
+    </div>
+
+    <!-- 音量・ミュート（控えめに右上） -->
+    <div id="audio-controls">
+      <button id="mute-button" aria-label="音を消す">🔊</button>
+      <input id="volume" type="range" min="0" max="100" value="80" aria-label="音量" />
+    </div>
+
+    <!-- 隣の場面へ移動する方向ボタン（行ける方向だけ表示） -->
+    <button id="nav-left" class="nav nav-left hidden" aria-label="左へ">‹</button>
+    <button id="nav-right" class="nav nav-right hidden" aria-label="右へ">›</button>
+    <button id="nav-up" class="nav nav-up hidden" aria-label="上へ">‹</button>
+    <button id="nav-down" class="nav nav-down hidden" aria-label="下へ">‹</button>
+
+    <!-- スタート画面：「はじめる」を押すと一日が動き出す（音もこの後に立ち上げる） -->
+    <div id="start-screen">
+      <div class="start-inner">
+        <p class="subtitle">― 夏の田舎の、ある一日 ―</p>
+        <h1 class="title">ひと夏の一日</h1>
+        <button id="start-button" class="start-button">はじめる</button>
+        <p class="hint">画面は横向きで、音を出してお楽しみください</p>
+      </div>
+    </div>
+
+    <!-- デバッグ（管理者）パネル：D キー、または ?debug=1 で開く -->
+    <div id="debug" class="hidden">
+      <div class="dbg-title">デバッグ <small>(D で開閉)</small></div>
+      <div class="dbg-row">時刻 <input id="dbg-time" type="range" min="0" max="100" value="0" /><span id="dbg-time-v">朝</span></div>
+      <div class="dbg-row">日 <button id="dbg-day-dn">−</button><span id="dbg-day">1</span><button id="dbg-day-up">＋</button></div>
+      <div class="dbg-row">天気 <button data-w="sunny">晴</button><button data-w="cloudy">曇</button><button data-w="shower">夕立</button></div>
+      <div class="dbg-row">祭り <button id="dbg-fes">切替</button><span id="dbg-fes-v">自動</span></div>
+      <div class="dbg-row">速さ <button data-sp="1">1x</button><button data-sp="30">30x</button><button data-sp="120">120x</button></div>
+      <div class="dbg-row">場所 <button data-sc="engawa">縁側</button><button data-sc="harappa">原</button><button data-sc="jinja">社</button><button data-sc="tanbomichi">田</button><button data-sc="kawabe">川</button></div>
+      <div class="dbg-row"><button id="dbg-pause">停止/再開</button></div>
+    </div>
+
+    <!-- スマホを縦に持ったときの案内（横画面では隠れる） -->
+    <div id="rotate-notice">
+      <p>横にしてください</p>
+    </div>
+
+  </body>
 </html>
